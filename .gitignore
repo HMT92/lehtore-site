@@ -4,4 +4,4 @@ node_modules/
 # Thumbnails in photos/thumbs/ should always be committed.
 # Uncomment the line below if you prefer to keep originals out of git
 # and manage them separately (e.g. local drive or external storage).
-# photos/originals/
+# photos/uploads/

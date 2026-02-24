@@ -1,7 +1,7 @@
 /**
  * LEHTORE — Photo Processor
  *
- * Run by GitHub Actions when new photos are pushed to photos/originals/.
+ * Run by GitHub Actions when new photos are pushed to photos/uploads/.
  * Generates thumbnails with Sharp and stubs photos.json metadata from EXIF.
  *
  * Usage (locally or in CI):  node scripts/process-photos.js
@@ -12,7 +12,7 @@ import exifr      from 'exifr';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { join, basename, extname } from 'path';
 
-const ORIGINALS_DIR  = 'photos/originals';
+const ORIGINALS_DIR  = 'photos/uploads';
 const THUMBS_DIR     = 'photos/thumbs';
 const PHOTOS_JSON    = 'photos.json';
 const THUMB_WIDTH    = 1200;          // px, height auto
@@ -65,7 +65,7 @@ const files = readdirSync(ORIGINALS_DIR).filter(f => {
 });
 
 if (files.length === 0) {
-  console.log('No image files found in photos/originals/. Nothing to do.');
+  console.log('No image files found in photos/uploads/. Nothing to do.');
   process.exit(0);
 }
 
@@ -127,7 +127,7 @@ for (const filename of files) {
     /* ── Build stub entry ───────────────────────────────────────────────────── */
     const entry = {
       id,
-      src:         `photos/originals/${filename}`,
+      src:         `photos/uploads/${filename}`,
       thumb:       `photos/thumbs/${thumbName}`,
       title:       '',
       description: '',
