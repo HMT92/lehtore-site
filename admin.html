@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — LEHTORE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { overflow: hidden; }
+    #admin-loading {
+      position: fixed; inset: 0; background: rgba(10,10,10,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 700; display: none;
+    }
+    .loading-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      animation: preloaderPulse 1.2s ease infinite;
+    }
+    #setup-modal { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="admin-loading">
+    <span class="loading-text">LOADING…</span>
+  </div>
+
+  <!-- Setup Modal (first-time) -->
+  <div class="modal-backdrop" id="setup-modal">
+    <div class="modal">
+      <h2 class="modal-title">Connect to GitHub</h2>
+      <p class="modal-subtitle">
+        These credentials are saved only in your browser (localStorage).
+        Generate a Personal Access Token at
+        <strong>GitHub → Settings → Developer Settings → Personal access tokens → Tokens (classic)</strong>
+        with <strong>public_repo</strong> scope.
+      </p>
+      <form id="setup-form">
+        <div class="form-group">
+          <label class="form-label" for="cfg-owner">GitHub Username</label>
+          <input class="form-input" id="cfg-owner" type="text" placeholder="your-username" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cfg-repo">Repository Name</label>
+          <input class="form-input" id="cfg-repo" type="text" placeholder="lehtore-site" required autocomplete="off">
+          <p class="form-hint">The name of your GitHub repository (not the full URL).</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cfg-branch">Branch</label>
+          <input class="form-input" id="cfg-branch" type="text" placeholder="main" value="main">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cfg-token">Personal Access Token</label>
+          <input class="form-input" id="cfg-token" type="password" placeholder="ghp_…" required autocomplete="off">
+          <p class="form-hint">Required scope: <code style="background:var(--surface);padding:1px 5px;border-radius:2px;">public_repo</code></p>
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%">Connect &amp; Load Photos</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Header -->
+  <div class="admin-header">
+    <span class="admin-title">LEHTORE <span style="color:var(--accent);">Admin</span></span>
+    <div class="admin-header-actions">
+      <span class="badge badge-pending" id="dirty-count" style="display:none"></span>
+      <button class="btn btn-ghost" id="refresh-btn" title="Reload from GitHub">&#8635; Refresh</button>
+      <button class="btn btn-primary" id="publish-btn" disabled>Publish to GitHub</button>
+      <button class="btn btn-ghost" id="sign-out">Sign out</button>
+      <a class="btn btn-secondary" href="index.html">&#8592; Gallery</a>
+    </div>
+  </div>
+
+  <!-- Admin Body -->
+  <div class="admin-body">
+
+    <!-- Left: photo grid -->
+    <div id="admin-grid">
+      <!-- Populated by admin.js -->
+    </div>
+
+    <!-- Right: edit panel -->
+    <div id="edit-panel">
+      <div class="edit-panel-empty">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+          <rect x="4" y="8" width="32" height="24" rx="2"/>
+          <circle cx="20" cy="20" r="6"/>
+          <circle cx="20" cy="20" r="2" fill="currentColor" stroke="none"/>
+          <path d="M14 8l1.5-3h9L26 8"/>
+        </svg>
+        <p style="font-size:13px;color:var(--text-faint);">Select a photo to edit</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

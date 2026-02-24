@@ -1,7 +1,149 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LEHTORE — Photography</title>
+  <meta name="description" content="Photography by Lehtore. Architecture and travel photography shot on Hasselblad X2D II.">
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="LEHTORE — Photography">
+  <meta property="og:description" content="Architecture and travel photography shot on Hasselblad X2D II.">
+  <meta property="og:type"        content="website">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
 <body>
-    <h1>Welcome to the lehtore.com Sandbox</h1>
-    <p>I am currently tinkering with this site!</p>
+
+  <!-- Preloader -->
+  <div id="preloader">
+    <span class="preloader-wordmark">LEHTORE</span>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <a href="/" class="logo">LEHTORE</a>
+    <nav>
+      <a href="#gallery">Photos</a>
+      <a href="admin.html" class="admin-link">Admin</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section id="hero">
+    <div class="hero-content">
+      <div class="hero-eyebrow hero-animate">Photography</div>
+      <h1 class="hero-name">LEHTORE</h1>
+      <div class="hero-tagline hero-animate">
+        <span>Hasselblad X2D II</span>
+        <span class="sep">·</span>
+        <span>Architecture</span>
+        <span class="sep">·</span>
+        <span>Travel</span>
+      </div>
+    </div>
+    <div class="hero-scroll hero-animate">
+      <span>Scroll</span>
+      <div class="scroll-line"></div>
+    </div>
+  </section>
+
+  <!-- Controls -->
+  <section id="controls">
+    <div id="filter-pills">
+      <!-- Populated by gallery.js -->
+    </div>
+    <div class="controls-divider"></div>
+    <div class="controls-right">
+      <span class="sort-label">Sort</span>
+      <select id="sort-select" aria-label="Sort photos">
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
+        <option value="title">Title A–Z</option>
+      </select>
+      <select id="tag-filter" aria-label="Filter by tag" style="display:none">
+        <!-- Populated by gallery.js -->
+      </select>
+    </div>
+  </section>
+
+  <!-- Gallery -->
+  <main id="gallery" aria-label="Photo gallery">
+    <!-- Populated by gallery.js -->
+  </main>
+
+  <!-- Empty State -->
+  <div id="empty-state" role="status" aria-live="polite">
+    <svg class="empty-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="10" width="40" height="30" rx="3"/>
+      <circle cx="24" cy="25" r="8"/>
+      <circle cx="24" cy="25" r="3"/>
+      <path d="M16 10l2-4h8l2 4"/>
+      <circle cx="37" cy="17" r="1.5" fill="currentColor" stroke="none"/>
+    </svg>
+    <p class="empty-state-title">No photos</p>
+    <p class="empty-msg"></p>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+
+    <!-- Top bar -->
+    <div class="lb-bar">
+      <div class="lb-bar-left">
+        <span id="lb-counter"></span>
+      </div>
+      <div class="lb-controls">
+        <button class="lb-btn" id="lb-prev" aria-label="Previous photo" title="Previous (←)">&#8592;</button>
+        <button class="lb-btn" id="lb-next" aria-label="Next photo"     title="Next (→)">&#8594;</button>
+        <button id="lb-close" aria-label="Close lightbox" title="Close (Esc)">&#x2715;</button>
+      </div>
+    </div>
+
+    <!-- Image -->
+    <div id="lb-image-container">
+      <img id="lb-image" alt="">
+      <div class="lb-zoom-hint">Scroll to zoom · Double-click to reset</div>
+    </div>
+
+    <!-- Info bar -->
+    <div id="lb-info">
+      <div class="lb-info-primary">
+        <div id="lb-title"></div>
+        <div id="lb-location"></div>
+      </div>
+      <div class="lb-info-meta">
+        <div class="lb-meta-item">
+          <span class="lb-meta-label">Date</span>
+          <span class="lb-meta-value" id="lb-date"></span>
+        </div>
+        <div class="lb-meta-item">
+          <span class="lb-meta-label">Camera</span>
+          <span class="lb-meta-value" id="lb-camera"></span>
+        </div>
+        <div class="lb-meta-item">
+          <span class="lb-meta-label">Category</span>
+          <span class="lb-meta-value" id="lb-category"></span>
+        </div>
+      </div>
+      <div class="lb-info-tags" id="lb-tags"></div>
+      <p id="lb-desc"></p>
+    </div>
+
+  </div><!-- /lightbox -->
+
+  <!-- Footer -->
+  <footer>
+    <span class="footer-wordmark">LEHTORE</span>
+    <span class="footer-copy">&copy; <span id="year"></span> All rights reserved</span>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script src="js/gallery.js"></script>
 </body>
 </html>

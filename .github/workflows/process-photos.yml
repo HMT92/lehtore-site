@@ -1,0 +1,43 @@
+name: Process New Photos
+
+# Runs whenever images are pushed to photos/originals/
+on:
+  push:
+    paths:
+      - 'photos/originals/**'
+
+jobs:
+  process:
+    name: Generate thumbnails & update photos.json
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # needed to commit thumbnails + updated photos.json
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Use default GITHUB_TOKEN — no extra secrets needed
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Process photos (thumbnails + EXIF + photos.json stubs)
+        run: node scripts/process-photos.js
+
+      - name: Commit results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add photos/thumbs/ photos.json
+          # Only commit if there are staged changes
+          git diff --staged --quiet || git commit -m "chore: auto-process new photos [skip ci]"
+          git push
