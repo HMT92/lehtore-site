@@ -66,7 +66,7 @@ function cacheEls() {
 /* ── Data ─────────────────────────────────────────────────── */
 async function loadPhotos() {
   try {
-    const res = await fetch('photos.json');
+    const res = await fetch('photos.json', { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return Array.isArray(data.photos) ? data.photos : [];
