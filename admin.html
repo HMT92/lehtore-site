@@ -10,6 +10,11 @@
   <link rel="stylesheet" href="css/style.css">
   <style>
     body { overflow: hidden; }
+    #admin-grid.drag-over {
+      outline: 2px dashed var(--accent);
+      outline-offset: -4px;
+      background: var(--accent-dim);
+    }
     #admin-loading {
       position: fixed; inset: 0; background: rgba(10,10,10,0.7);
       display: flex; align-items: center; justify-content: center;
@@ -71,6 +76,8 @@
     <span class="admin-title">LEHTORE <span style="color:var(--accent);">Admin</span></span>
     <div class="admin-header-actions">
       <span class="badge badge-pending" id="dirty-count" style="display:none"></span>
+      <button class="btn btn-secondary" id="upload-btn" title="Upload photos (or drag onto the grid)">&#8593; Upload Photos</button>
+      <input type="file" id="upload-input" accept="image/*" multiple style="display:none">
       <button class="btn btn-ghost" id="refresh-btn" title="Reload from GitHub">&#8635; Refresh</button>
       <button class="btn btn-primary" id="publish-btn" disabled>Publish to GitHub</button>
       <button class="btn btn-ghost" id="sign-out">Sign out</button>

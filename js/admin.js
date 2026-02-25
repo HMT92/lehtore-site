@@ -2,48 +2,62 @@
 
 /* ============================================================
    LEHTORE — Admin Panel
-   Loads photos.json from GitHub, lets you edit metadata,
-   and publishes changes back via the GitHub Contents API.
+   - Load / edit / publish photos.json via GitHub Contents API
+   - Upload new photos directly (triggers GitHub Action)
+   - Delete photos (removes from JSON + deletes files from repo)
 
-   Auth: GitHub Personal Access Token (stored in localStorage)
+   Auth: GitHub Personal Access Token stored in localStorage
    Required scope: public_repo (for public repos)
    ============================================================ */
 
 const STORAGE_KEY = 'lehtore-admin-config';
-const CATEGORIES  = ['Architecture', 'Travel', 'Nature', 'Street', 'People', 'Other'];
+const CATEGORIES  = ['Architecture', 'Travel', 'Nature', 'Street', 'People', 'Other', 'Uncategorized'];
 
 /* ── State ────────────────────────────────────────────────── */
 const state = {
-  config:    null,   // { owner, repo, branch, token }
-  photos:    [],     // current photos.json content
-  dirty:     {},     // { [id]: modified photo object }
-  sha:       null,   // GitHub file SHA (required for PUT)
-  selected:  null,   // currently selected photo id
+  config:         null,   // { owner, repo, branch, token }
+  photos:         [],     // current photos array
+  dirty:          {},     // { [id]: modified photo object }
+  pendingDeletes: [],     // [ photo objects ] to remove on publish
+  sha:            null,   // photos.json SHA for GitHub API
+  selected:       null,   // currently selected photo id
 };
 
 /* ── Init ─────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
-    try {
-      state.config = JSON.parse(saved);
-      startAdmin();
-    } catch {
-      showSetup();
-    }
+    try { state.config = JSON.parse(saved); startAdmin(); }
+    catch { showSetup(); }
   } else {
     showSetup();
   }
+
+  // Upload button → hidden file input
+  document.getElementById('upload-btn')?.addEventListener('click', () => {
+    document.getElementById('upload-input').click();
+  });
+  document.getElementById('upload-input')?.addEventListener('change', e => {
+    const files = Array.from(e.target.files);
+    if (files.length) uploadPhotos(files);
+    e.target.value = '';
+  });
+
+  // Drag-and-drop on the grid
+  const grid = document.getElementById('admin-grid');
+  grid?.addEventListener('dragover', e => { e.preventDefault(); grid.classList.add('drag-over'); });
+  grid?.addEventListener('dragleave', () => grid.classList.remove('drag-over'));
+  grid?.addEventListener('drop', e => {
+    e.preventDefault();
+    grid.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) uploadPhotos(files);
+  });
 });
 
 /* ── Setup Modal ──────────────────────────────────────────── */
-function showSetup() {
-  document.getElementById('setup-modal').style.display = 'flex';
-}
-
-function hideSetup() {
-  document.getElementById('setup-modal').style.display = 'none';
-}
+function showSetup() { document.getElementById('setup-modal').style.display = 'flex'; }
+function hideSetup() { document.getElementById('setup-modal').style.display = 'none'; }
 
 document.getElementById('setup-form').addEventListener('submit', e => {
   e.preventDefault();
@@ -51,9 +65,7 @@ document.getElementById('setup-form').addEventListener('submit', e => {
   const repo   = document.getElementById('cfg-repo').value.trim();
   const branch = document.getElementById('cfg-branch').value.trim() || 'main';
   const token  = document.getElementById('cfg-token').value.trim();
-
   if (!owner || !repo || !token) return;
-
   state.config = { owner, repo, branch, token };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.config));
   hideSetup();
@@ -66,118 +78,210 @@ document.getElementById('sign-out')?.addEventListener('click', () => {
   location.reload();
 });
 
+/* ── GitHub API helpers ───────────────────────────────────── */
+function apiUrl(path) {
+  const { owner, repo } = state.config;
+  return `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+}
+function authHeaders() {
+  return {
+    Authorization: `token ${state.config.token}`,
+    Accept: 'application/vnd.github.v3+json',
+  };
+}
+
+async function ghGetFile(path) {
+  const res = await fetch(`${apiUrl(path)}?ref=${state.config.branch}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const msg = await res.json().then(d => d.message).catch(() => res.statusText);
+    throw new Error(`GitHub: ${msg}`);
+  }
+  const data    = await res.json();
+  const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+  return { content, sha: data.sha };
+}
+
+async function ghPutFile(path, content, sha, message) {
+  const b64 = btoa(unescape(encodeURIComponent(content)));
+  const body = { message, content: b64, branch: state.config.branch };
+  if (sha) body.sha = sha;
+  const res = await fetch(apiUrl(path), {
+    method: 'PUT',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const msg = await res.json().then(d => d.message).catch(() => res.statusText);
+    throw new Error(`GitHub: ${msg}`);
+  }
+  return res.json();
+}
+
+async function ghDeleteFile(path, message) {
+  // Fetch SHA first
+  let sha;
+  try {
+    const res = await fetch(`${apiUrl(path)}?ref=${state.config.branch}`, { headers: authHeaders() });
+    if (!res.ok) return; // file may not exist (e.g. external URL photo)
+    const data = await res.json();
+    sha = data.sha;
+  } catch { return; }
+
+  await fetch(apiUrl(path), {
+    method: 'DELETE',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, sha, branch: state.config.branch }),
+  });
+}
+
+async function ghUploadBinary(path, arrayBuffer, message) {
+  // Convert ArrayBuffer to base64
+  const bytes  = new Uint8Array(arrayBuffer);
+  let binary   = '';
+  const chunk  = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  const b64 = btoa(binary);
+
+  const body = { message, content: b64, branch: state.config.branch };
+  const res = await fetch(apiUrl(path), {
+    method: 'PUT',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const msg = await res.json().then(d => d.message).catch(() => res.statusText);
+    throw new Error(`GitHub: ${msg}`);
+  }
+  return res.json();
+}
+
 /* ── Load from GitHub ─────────────────────────────────────── */
 async function startAdmin() {
   showLoading(true);
   try {
     const { content, sha } = await ghGetFile('photos.json');
-    state.sha    = sha;
-    state.photos = JSON.parse(content).photos || [];
-    state.dirty  = {};
+    state.sha            = sha;
+    state.photos         = JSON.parse(content).photos || [];
+    state.dirty          = {};
+    state.pendingDeletes = [];
     renderGrid();
     updatePublishBtn();
   } catch (err) {
-    showToast('Failed to load photos: ' + err.message, 'error');
-    console.error(err);
+    showToast('Failed to load: ' + err.message, 'error');
   } finally {
     showLoading(false);
   }
 }
 
-async function ghGetFile(path) {
-  const { owner, repo, branch, token } = state.config;
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `token ${token}`,
-      Accept: 'application/vnd.github.v3+json',
-    },
-  });
-  if (!res.ok) {
-    const msg = await res.json().then(d => d.message).catch(() => res.statusText);
-    throw new Error(`GitHub API: ${msg}`);
+/* ── Upload photos ────────────────────────────────────────── */
+async function uploadPhotos(files) {
+  for (const file of files) {
+    showToast(`Uploading ${file.name}…`, '');
+    try {
+      const buf = await file.arrayBuffer();
+      await ghUploadBinary(
+        `photos/uploads/${file.name}`,
+        buf,
+        `Upload ${file.name} via admin panel`
+      );
+      showToast(`${file.name} uploaded. GitHub Action will process it (~2 min). Click Refresh.`, 'success');
+    } catch (err) {
+      showToast(`Upload failed: ${err.message}`, 'error');
+    }
   }
-  const data = await res.json();
-  const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
-  return { content, sha: data.sha };
+}
+
+/* ── Delete photo ─────────────────────────────────────────── */
+function markForDelete(id) {
+  const photo = state.photos.find(p => p.id === id);
+  if (!photo) return;
+  if (!confirm(`Remove "${photo.title || photo.id}" from the gallery?\n\nThis will also delete the image files from the repository.`)) return;
+
+  state.pendingDeletes.push(photo);
+  state.photos = state.photos.filter(p => p.id !== id);
+  delete state.dirty[id];
+  state.selected = null;
+
+  renderGrid();
+  // Show empty edit panel
+  document.getElementById('edit-panel').innerHTML = `
+    <div class="edit-panel-empty">
+      <p style="color:var(--accent);font-size:13px;">Photo marked for deletion.</p>
+      <p style="font-size:12px;color:var(--text-faint);">Click <strong>Publish to GitHub</strong> to confirm removal.</p>
+    </div>`;
+  updatePublishBtn();
 }
 
 /* ── Publish to GitHub ────────────────────────────────────── */
+document.getElementById('publish-btn')?.addEventListener('click', publishToGitHub);
+document.getElementById('refresh-btn')?.addEventListener('click', startAdmin);
+
 async function publishToGitHub() {
-  if (Object.keys(state.dirty).length === 0) {
-    showToast('No unsaved changes.', '');
-    return;
-  }
+  const hasEdits   = Object.keys(state.dirty).length > 0;
+  const hasDeletes = state.pendingDeletes.length > 0;
+  if (!hasEdits && !hasDeletes) { showToast('No changes to publish.', ''); return; }
 
   const btn = document.getElementById('publish-btn');
   btn.disabled = true;
   btn.textContent = 'Publishing…';
 
-  // Merge dirty changes into photos array
-  const merged = state.photos.map(p => state.dirty[p.id] ? state.dirty[p.id] : p);
-  const json   = JSON.stringify({ photos: merged }, null, 2);
-  const b64    = btoa(unescape(encodeURIComponent(json)));
-
   try {
-    const { owner, repo, branch, token } = state.config;
-    const url = `https://api.github.com/repos/${owner}/${repo}/contents/photos.json`;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: 'Update photo metadata via admin panel',
-        content: b64,
-        sha: state.sha,
-        branch,
-      }),
-    });
-
-    if (!res.ok) {
-      const msg = await res.json().then(d => d.message).catch(() => res.statusText);
-      throw new Error(msg);
+    // 1. Delete files for removed photos (non-external URLs only)
+    for (const photo of state.pendingDeletes) {
+      const isLocal = p => p && !p.startsWith('http');
+      if (isLocal(photo.src))   await ghDeleteFile(photo.src,   `Remove ${photo.id} upload`);
+      if (isLocal(photo.thumb)) await ghDeleteFile(photo.thumb, `Remove ${photo.id} thumbnail`);
     }
 
-    const data   = await res.json();
-    state.sha    = data.content.sha;
-    state.photos = merged;
-    state.dirty  = {};
+    // 2. Merge edits and save photos.json
+    if (hasEdits || hasDeletes) {
+      const merged = state.photos.map(p => state.dirty[p.id] ?? p);
+      const json   = JSON.stringify({ photos: merged }, null, 2);
 
-    // Mark all cards saved
-    document.querySelectorAll('.admin-card-status').forEach(d => {
-      d.classList.remove('dirty');
-      d.classList.add('saved');
-    });
+      // Re-fetch SHA in case it changed during file deletions
+      const { sha } = await ghGetFile('photos.json');
+      const result  = await ghPutFile('photos.json', json, sha, 'Update photo metadata via admin panel');
+
+      state.sha            = result.content.sha;
+      state.photos         = merged;
+      state.dirty          = {};
+      state.pendingDeletes = [];
+    }
+
+    renderGrid();
     updatePublishBtn();
-    showToast('Published! Site will update in ~1 minute.', 'success');
+    showToast('Published! Site updates in ~1 minute.', 'success');
   } catch (err) {
     showToast('Publish failed: ' + err.message, 'error');
-    console.error(err);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Publish to GitHub';
   }
 }
 
-document.getElementById('publish-btn')?.addEventListener('click', publishToGitHub);
-document.getElementById('refresh-btn')?.addEventListener('click', startAdmin);
-
 /* ── Grid ─────────────────────────────────────────────────── */
 function renderGrid() {
   const grid = document.getElementById('admin-grid');
   if (!grid) return;
 
+  if (state.photos.length === 0 && state.pendingDeletes.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-faint);font-size:13px;">
+      No photos yet. Drag images here or click Upload to add photos.
+    </div>`;
+    return;
+  }
+
   grid.innerHTML = state.photos.map(photo => {
-    const thumb = photo.thumb || photo.src || '';
-    const title = photo.title || 'Untitled';
+    const thumb   = photo.thumb || photo.src || '';
+    const title   = photo.title || photo.id;
+    const isDirty = !!state.dirty[photo.id];
     return `
-<div class="admin-card" data-id="${photo.id}" title="${esc(title)}">
+<div class="admin-card${state.selected === photo.id ? ' selected' : ''}" data-id="${photo.id}" title="${esc(title)}">
   <img src="${esc(thumb)}" alt="${esc(title)}" loading="lazy">
   <div class="admin-card-title">${esc(title)}</div>
-  <div class="admin-card-status" id="status-${photo.id}"></div>
+  <div class="admin-card-status${isDirty ? ' dirty' : ''}" id="status-${photo.id}"></div>
 </div>`;
   }).join('');
 
@@ -185,18 +289,16 @@ function renderGrid() {
     card.addEventListener('click', () => selectPhoto(card.dataset.id));
   });
 
-  // Auto-select first
-  if (state.photos.length > 0) {
-    const firstId = state.photos[0].id;
-    if (!state.selected) selectPhoto(firstId);
+  if (state.selected && state.photos.find(p => p.id === state.selected)) {
+    selectPhoto(state.selected);
   }
 }
 
 function selectPhoto(id) {
   state.selected = id;
-  document.querySelectorAll('.admin-card').forEach(c => {
-    c.classList.toggle('selected', c.dataset.id === id);
-  });
+  document.querySelectorAll('.admin-card').forEach(c =>
+    c.classList.toggle('selected', c.dataset.id === id)
+  );
   renderEditPanel(id);
 }
 
@@ -209,7 +311,7 @@ function renderEditPanel(id) {
   const thumb = photo.thumb || photo.src || '';
 
   panel.innerHTML = `
-<img class="edit-preview" src="${esc(thumb)}" alt="${esc(photo.title || '')}">
+<img class="edit-preview" src="${esc(thumb)}" alt="">
 
 <div>
   <div class="edit-section-title">Basic Info</div>
@@ -236,17 +338,15 @@ function renderEditPanel(id) {
   <div class="form-group">
     <label class="form-label" for="ef-category">Category</label>
     <select class="form-select" id="ef-category">
-      ${CATEGORIES.map(c =>
-        `<option value="${c}"${c === photo.category ? ' selected' : ''}>${c}</option>`
-      ).join('')}
+      ${CATEGORIES.map(c => `<option value="${c}"${c === photo.category ? ' selected' : ''}>${c}</option>`).join('')}
     </select>
   </div>
   <div class="form-group">
     <label class="form-label">Tags</label>
     <div class="tag-chips" id="tag-chips">
-      ${(photo.tags || []).map(t => tagChipHTML(t)).join('')}
+      ${(photo.tags || []).map(tagChipHTML).join('')}
     </div>
-    <div style="display:flex;gap:6px;margin-top:4px;">
+    <div style="display:flex;gap:6px;margin-top:6px;">
       <input class="form-input" id="ef-tag-input" type="text" placeholder="Add tag…" style="flex:1">
       <button class="btn btn-secondary" id="ef-tag-add" type="button">Add</button>
     </div>
@@ -264,33 +364,28 @@ function renderEditPanel(id) {
   </div>
 </div>
 
-<div style="display:flex;gap:8px;padding-top:8px;">
+<div style="display:flex;gap:8px;padding-top:8px;flex-wrap:wrap;">
   <button class="btn btn-primary" id="ef-save">Save Changes</button>
   <button class="btn btn-secondary" id="ef-reset">Reset</button>
+  <button class="btn btn-danger" id="ef-delete" style="margin-left:auto;">Delete Photo</button>
 </div>
 `;
 
-  // Tag add
   const tagInput = document.getElementById('ef-tag-input');
   document.getElementById('ef-tag-add').addEventListener('click', () => addTag(tagInput.value));
-  tagInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput.value); }
-  });
-
-  // Tag remove (delegated)
+  tagInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput.value); } });
   document.getElementById('tag-chips').addEventListener('click', e => {
     const rm = e.target.closest('.tag-chip-remove');
     if (rm) removeTag(rm.dataset.tag);
   });
-
-  // Save / Reset
-  document.getElementById('ef-save').addEventListener('click', () => savePhoto(id));
-  document.getElementById('ef-reset').addEventListener('click', () => {
+  document.getElementById('ef-save').addEventListener('click',   () => savePhoto(id));
+  document.getElementById('ef-reset').addEventListener('click',  () => {
     delete state.dirty[id];
     renderEditPanel(id);
     markCard(id, false);
     updatePublishBtn();
   });
+  document.getElementById('ef-delete').addEventListener('click', () => markForDelete(id));
 }
 
 function tagChipHTML(tag) {
@@ -318,71 +413,57 @@ function removeTag(tag) {
 }
 
 function savePhoto(id) {
-  const read = sel => document.getElementById(sel)?.value;
-  const draft = {
-    title:       read('ef-title'),
-    location:    read('ef-location'),
-    date:        read('ef-date'),
-    description: read('ef-desc'),
-    category:    read('ef-category'),
+  const val = sel => document.getElementById(sel)?.value ?? '';
+  applyDraft({
+    title:       val('ef-title'),
+    location:    val('ef-location'),
+    date:        val('ef-date'),
+    description: val('ef-desc'),
+    category:    val('ef-category'),
     featured:    document.getElementById('ef-featured')?.checked ?? false,
-    // tags already tracked via applyDraft
-  };
-  applyDraft(draft);
+  });
   const saved = state.dirty[id];
-  // Update card title in grid
   const cardTitle = document.querySelector(`.admin-card[data-id="${id}"] .admin-card-title`);
-  if (cardTitle) cardTitle.textContent = saved.title || 'Untitled';
+  if (cardTitle) cardTitle.textContent = saved.title || id;
   markCard(id, true);
   updatePublishBtn();
-  showToast('Saved locally. Click "Publish to GitHub" when ready.', '');
+  showToast('Saved locally — click Publish to GitHub when ready.', '');
 }
 
 /* ── Helpers ──────────────────────────────────────────────── */
 function getPhoto(id) {
   return state.dirty[id] || state.photos.find(p => p.id === id) || null;
 }
-
 function applyDraft(partial) {
-  const id    = state.selected;
-  const base  = state.dirty[id] || state.photos.find(p => p.id === id) || {};
+  const id   = state.selected;
+  const base = state.dirty[id] || state.photos.find(p => p.id === id) || {};
   state.dirty[id] = { ...base, ...partial };
 }
-
 function markCard(id, dirty) {
   const dot = document.getElementById(`status-${id}`);
   if (!dot) return;
   dot.classList.toggle('dirty', dirty);
   dot.classList.remove('saved');
 }
-
 function updatePublishBtn() {
-  const count = Object.keys(state.dirty).length;
-  const badge = document.getElementById('dirty-count');
-  const btn   = document.getElementById('publish-btn');
-  if (badge) badge.textContent = count > 0 ? `${count} unsaved` : '';
-  if (badge) badge.style.display = count > 0 ? '' : 'none';
+  const count  = Object.keys(state.dirty).length + state.pendingDeletes.length;
+  const badge  = document.getElementById('dirty-count');
+  const btn    = document.getElementById('publish-btn');
+  if (badge) { badge.textContent = count > 0 ? `${count} unsaved` : ''; badge.style.display = count > 0 ? '' : 'none'; }
   if (btn)   btn.disabled = count === 0;
 }
-
 function showLoading(on) {
   const el = document.getElementById('admin-loading');
   if (el) el.style.display = on ? 'flex' : 'none';
 }
-
 function showToast(msg, type = '') {
   const toast = document.getElementById('toast');
   if (!toast) return;
   toast.textContent = msg;
   toast.className = `show ${type}`;
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => { toast.className = ''; }, 3500);
+  toast._t = setTimeout(() => { toast.className = ''; }, 4000);
 }
-
 function esc(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
