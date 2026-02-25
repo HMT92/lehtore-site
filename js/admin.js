@@ -365,11 +365,33 @@ function renderEditPanel(id) {
 </div>
 
 <div style="display:flex;gap:8px;padding-top:8px;flex-wrap:wrap;">
-  <button class="btn btn-primary" id="ef-save">Save Changes</button>
-  <button class="btn btn-secondary" id="ef-reset">Reset</button>
+  <button class="btn btn-secondary" id="ef-reset">Revert</button>
   <button class="btn btn-danger" id="ef-delete" style="margin-left:auto;">Delete Photo</button>
 </div>
 `;
+
+  // Auto-save: stage changes immediately as the user types
+  function autoSave() {
+    const val = sel => document.getElementById(sel)?.value ?? '';
+    applyDraft({
+      title:       val('ef-title'),
+      location:    val('ef-location'),
+      date:        val('ef-date'),
+      description: val('ef-desc'),
+      category:    val('ef-category'),
+      featured:    document.getElementById('ef-featured')?.checked ?? false,
+    });
+    const cardTitle = document.querySelector(`.admin-card[data-id="${id}"] .admin-card-title`);
+    const newTitle  = document.getElementById('ef-title')?.value || id;
+    if (cardTitle) cardTitle.textContent = newTitle;
+    markCard(id, true);
+    updatePublishBtn();
+  }
+
+  ['ef-title', 'ef-location', 'ef-date', 'ef-desc', 'ef-category'].forEach(fid => {
+    document.getElementById(fid)?.addEventListener('input', autoSave);
+  });
+  document.getElementById('ef-featured')?.addEventListener('change', autoSave);
 
   const tagInput = document.getElementById('ef-tag-input');
   document.getElementById('ef-tag-add').addEventListener('click', () => addTag(tagInput.value));
@@ -378,8 +400,7 @@ function renderEditPanel(id) {
     const rm = e.target.closest('.tag-chip-remove');
     if (rm) removeTag(rm.dataset.tag);
   });
-  document.getElementById('ef-save').addEventListener('click',   () => savePhoto(id));
-  document.getElementById('ef-reset').addEventListener('click',  () => {
+  document.getElementById('ef-reset').addEventListener('click', () => {
     delete state.dirty[id];
     renderEditPanel(id);
     markCard(id, false);
@@ -410,24 +431,6 @@ function removeTag(tag) {
   applyDraft({ tags });
   const chips = document.getElementById('tag-chips');
   if (chips) chips.innerHTML = tags.map(tagChipHTML).join('');
-}
-
-function savePhoto(id) {
-  const val = sel => document.getElementById(sel)?.value ?? '';
-  applyDraft({
-    title:       val('ef-title'),
-    location:    val('ef-location'),
-    date:        val('ef-date'),
-    description: val('ef-desc'),
-    category:    val('ef-category'),
-    featured:    document.getElementById('ef-featured')?.checked ?? false,
-  });
-  const saved = state.dirty[id];
-  const cardTitle = document.querySelector(`.admin-card[data-id="${id}"] .admin-card-title`);
-  if (cardTitle) cardTitle.textContent = saved.title || id;
-  markCard(id, true);
-  updatePublishBtn();
-  showToast('Saved locally — click Publish to GitHub when ready.', '');
 }
 
 /* ── Helpers ──────────────────────────────────────────────── */
