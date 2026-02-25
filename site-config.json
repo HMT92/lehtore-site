@@ -1,7 +1,7 @@
 {
   "siteName": "LEHTORE",
   "heroEyebrow": "Photography",
-  "heroTagline": ["Hasselblad X2D II", "Architecture", "Travel"],
+  "heroTagline": [],
   "showHeroTagline": false,
-  "showScrollIndicator": false
+  "showScrollIndicator": true
 }
