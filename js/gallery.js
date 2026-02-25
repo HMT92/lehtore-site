@@ -20,6 +20,7 @@ const els = {};
 /* ── Init ─────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
   cacheEls();
+  await applyConfig();
   initHeroAnimation();
 
   state.photos = await loadPhotos();
@@ -61,6 +62,47 @@ function cacheEls() {
   els.lbClose     = get('lb-close');
   els.lbPrev      = get('lb-prev');
   els.lbNext      = get('lb-next');
+}
+
+/* ── Site Config ──────────────────────────────────────────── */
+async function applyConfig() {
+  let cfg = {};
+  try {
+    const res = await fetch('site-config.json', { cache: 'no-store' });
+    if (res.ok) cfg = await res.json();
+  } catch { /* config is optional */ }
+
+  // Site name
+  if (cfg.siteName) {
+    document.querySelectorAll('.logo, .footer-wordmark, .preloader-wordmark').forEach(el => {
+      el.textContent = cfg.siteName;
+    });
+    document.title = `${cfg.siteName} — Photography`;
+  }
+
+  // Hero eyebrow
+  const eyebrow = document.querySelector('.hero-eyebrow');
+  if (eyebrow && cfg.heroEyebrow !== undefined) eyebrow.textContent = cfg.heroEyebrow;
+
+  // Hero tagline — rebuild from array
+  const taglineEl = document.querySelector('.hero-tagline');
+  if (taglineEl) {
+    if (cfg.showHeroTagline === false) {
+      taglineEl.style.display = 'none';
+    } else {
+      taglineEl.style.display = '';
+      if (Array.isArray(cfg.heroTagline) && cfg.heroTagline.length) {
+        taglineEl.innerHTML = cfg.heroTagline
+          .map((item, i) => `<span>${item}</span>${i < cfg.heroTagline.length - 1 ? '<span class="sep">·</span>' : ''}`)
+          .join('');
+        taglineEl.classList.add('hero-animate');
+      }
+    }
+  }
+
+  // Scroll indicator
+  const scrollEl = document.querySelector('.hero-scroll');
+  if (scrollEl && cfg.showScrollIndicator === false) scrollEl.style.display = 'none';
 }
 
 /* ── Data ─────────────────────────────────────────────────── */

@@ -21,6 +21,8 @@ const state = {
   pendingDeletes: [],     // [ photo objects ] to remove on publish
   sha:            null,   // photos.json SHA for GitHub API
   selected:       null,   // currently selected photo id
+  siteConfig:     null,   // site-config.json content
+  configSha:      null,   // site-config.json SHA
 };
 
 /* ── Init ─────────────────────────────────────────────────── */
@@ -217,6 +219,7 @@ function markForDelete(id) {
 /* ── Publish to GitHub ────────────────────────────────────── */
 document.getElementById('publish-btn')?.addEventListener('click', publishToGitHub);
 document.getElementById('refresh-btn')?.addEventListener('click', startAdmin);
+document.getElementById('settings-btn')?.addEventListener('click', showSettingsPanel);
 
 async function publishToGitHub() {
   const hasEdits   = Object.keys(state.dirty).length > 0;
@@ -431,6 +434,113 @@ function removeTag(tag) {
   applyDraft({ tags });
   const chips = document.getElementById('tag-chips');
   if (chips) chips.innerHTML = tags.map(tagChipHTML).join('');
+}
+
+/* ── Site Settings ────────────────────────────────────────── */
+async function showSettingsPanel() {
+  // Load current config from GitHub if not yet loaded
+  if (!state.siteConfig) {
+    try {
+      const { content, sha } = await ghGetFile('site-config.json');
+      state.siteConfig = JSON.parse(content);
+      state.configSha  = sha;
+    } catch {
+      state.siteConfig = { siteName: 'LEHTORE', heroEyebrow: 'Photography', heroTagline: [], showHeroTagline: false, showScrollIndicator: false };
+      state.configSha  = null;
+    }
+  }
+
+  const cfg = state.siteConfig;
+  const panel = document.getElementById('edit-panel');
+
+  panel.innerHTML = `
+<div>
+  <div class="edit-section-title">Site Settings</div>
+
+  <div class="form-group">
+    <label class="form-label" for="cfg-sitename">Site Name (wordmark)</label>
+    <input class="form-input" id="cfg-sitename" type="text" value="${esc(cfg.siteName || '')}">
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="cfg-eyebrow">Hero Eyebrow Text</label>
+    <input class="form-input" id="cfg-eyebrow" type="text" value="${esc(cfg.heroEyebrow || '')}" placeholder="Photography">
+    <p class="form-hint">Small label that appears above the site name on the landing page.</p>
+  </div>
+
+  <div class="toggle-row">
+    <span class="toggle-label">Show Tagline</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="cfg-show-tagline"${cfg.showHeroTagline ? ' checked' : ''}>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+
+  <div class="form-group" id="tagline-fields" style="${cfg.showHeroTagline ? '' : 'opacity:0.4;pointer-events:none'}">
+    <label class="form-label">Tagline Items</label>
+    <p class="form-hint" style="margin-bottom:8px;">One item per line (e.g. "Architecture").</p>
+    <textarea class="form-textarea" id="cfg-tagline" rows="4">${(cfg.heroTagline || []).join('\n')}</textarea>
+  </div>
+
+  <div class="toggle-row">
+    <span class="toggle-label">Show Scroll Indicator</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="cfg-show-scroll"${cfg.showScrollIndicator ? ' checked' : ''}>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+</div>
+
+<div style="display:flex;gap:8px;padding-top:8px;">
+  <button class="btn btn-primary" id="cfg-save-btn">Save &amp; Publish</button>
+  <button class="btn btn-secondary" id="cfg-cancel-btn">Cancel</button>
+</div>
+`;
+
+  // Toggle tagline field opacity
+  document.getElementById('cfg-show-tagline').addEventListener('change', e => {
+    document.getElementById('tagline-fields').style.cssText =
+      e.target.checked ? '' : 'opacity:0.4;pointer-events:none';
+  });
+
+  document.getElementById('cfg-cancel-btn').addEventListener('click', () => {
+    state.siteConfig = null; // reset so it reloads next time
+    if (state.photos.length > 0 && state.selected) {
+      renderEditPanel(state.selected);
+    } else {
+      panel.innerHTML = `<div class="edit-panel-empty"><p style="font-size:13px;color:var(--text-faint);">Select a photo to edit</p></div>`;
+    }
+  });
+
+  document.getElementById('cfg-save-btn').addEventListener('click', saveSettings);
+}
+
+async function saveSettings() {
+  const taglineRaw = document.getElementById('cfg-tagline')?.value || '';
+  const newConfig = {
+    siteName:            document.getElementById('cfg-sitename')?.value.trim()  || 'LEHTORE',
+    heroEyebrow:         document.getElementById('cfg-eyebrow')?.value.trim()   || 'Photography',
+    heroTagline:         taglineRaw.split('\n').map(s => s.trim()).filter(Boolean),
+    showHeroTagline:     document.getElementById('cfg-show-tagline')?.checked   ?? false,
+    showScrollIndicator: document.getElementById('cfg-show-scroll')?.checked    ?? false,
+  };
+
+  const btn = document.getElementById('cfg-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const json   = JSON.stringify(newConfig, null, 2);
+    const result = await ghPutFile('site-config.json', json, state.configSha, 'Update site config via admin panel');
+    state.siteConfig = newConfig;
+    state.configSha  = result.content.sha;
+    showToast('Settings saved! Site updates in ~1 minute.', 'success');
+  } catch (err) {
+    showToast('Save failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save & Publish';
+  }
 }
 
 /* ── Helpers ──────────────────────────────────────────────── */
