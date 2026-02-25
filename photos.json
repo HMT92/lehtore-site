@@ -9,7 +9,12 @@
       "location": "Paris, France",
       "date": "2024-09-14",
       "category": "Architecture",
-      "tags": ["brutalism", "urban", "france", "skyscraper"],
+      "tags": [
+        "brutalism",
+        "urban",
+        "france",
+        "skyscraper"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 15541,
@@ -24,7 +29,12 @@
       "location": "Tokyo, Japan",
       "date": "2024-11-02",
       "category": "Travel",
-      "tags": ["japan", "street", "urban", "neon"],
+      "tags": [
+        "japan",
+        "street",
+        "urban",
+        "neon"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 7771,
@@ -39,7 +49,12 @@
       "location": "Chicago, USA",
       "date": "2024-07-21",
       "category": "Architecture",
-      "tags": ["chicago", "urban", "glass", "steel"],
+      "tags": [
+        "chicago",
+        "urban",
+        "glass",
+        "steel"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 14570,
@@ -54,7 +69,12 @@
       "location": "Santorini, Greece",
       "date": "2024-06-08",
       "category": "Travel",
-      "tags": ["greece", "sunset", "mediterranean", "whitewash"],
+      "tags": [
+        "greece",
+        "sunset",
+        "mediterranean",
+        "whitewash"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 7771,
@@ -69,7 +89,12 @@
       "location": "London, UK",
       "date": "2024-03-15",
       "category": "Architecture",
-      "tags": ["london", "glass", "skyscraper", "modern"],
+      "tags": [
+        "london",
+        "glass",
+        "skyscraper",
+        "modern"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 15541,
@@ -84,7 +109,12 @@
       "location": "Iceland",
       "date": "2024-08-19",
       "category": "Travel",
-      "tags": ["iceland", "waterfall", "nature", "landscape"],
+      "tags": [
+        "iceland",
+        "waterfall",
+        "nature",
+        "landscape"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 7771,
@@ -99,7 +129,12 @@
       "location": "Dubai, UAE",
       "date": "2024-01-30",
       "category": "Architecture",
-      "tags": ["dubai", "skyscraper", "glass", "pattern"],
+      "tags": [
+        "dubai",
+        "skyscraper",
+        "glass",
+        "pattern"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 14570,
@@ -114,10 +149,30 @@
       "location": "Washington, USA",
       "date": "2024-10-05",
       "category": "Nature",
-      "tags": ["forest", "pnw", "mist", "trees"],
+      "tags": [
+        "forest",
+        "pnw",
+        "mist",
+        "trees"
+      ],
       "camera": "Hasselblad X2D II",
       "width": 11656,
       "height": 15541,
+      "featured": false
+    },
+    {
+      "id": "b0005486",
+      "src": "photos/uploads/B0005486.jpg",
+      "thumb": "photos/thumbs/b0005486.jpg",
+      "title": "",
+      "description": "",
+      "location": "",
+      "date": "",
+      "category": "Uncategorized",
+      "tags": [],
+      "camera": "Hasselblad X2D II",
+      "width": 4160,
+      "height": 5546,
       "featured": false
     }
   ]
